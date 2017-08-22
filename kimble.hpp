@@ -20,6 +20,7 @@ class Peg
     public:
         Player* owner;
         int position = -1;
+        unsigned int boardPos();
         Peg(Player* owner);
 };
 
@@ -44,6 +45,7 @@ class Game
         void play();
         array<Peg*,BOARD_SIZE> board;
         int nplayers;
+        void displayAll();
     private:
         vector<Player*> players;
         vector<Player*> winners;

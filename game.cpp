@@ -68,8 +68,24 @@ void Game::play()
 // Display the winners at the end of game.
 void Game::displayWinners()
 {
+    cout << "Winners :" << endl;
     for (unsigned int i = 0 ; i < winners.size() ; i++)
-        cout << "#" << i+1 << ": Player " << winners[i]->number << endl;
+        cout  << "#" << i+1 << ": Player " << winners[i]->number << endl;
+}
+
+// Display situation
+void Game::displayAll()
+{
+    displayWinners();
+    cout << "Players :" << endl;
+    for (unsigned int i = 0 ; i < players.size() ; i++)
+    {
+        cout << "Player " << players[i]-> number << ":" << endl;
+        for (unsigned int p = 0; p < PEGS_NUMBER ; p++)
+            cout << "\t" << (players[i]->pegs[p]->boardPos()) << "(" << players[i]->pegs[p]->position << ")";
+        cout << endl;
+    }
+
 }
 
 // "Pops" (roll) the die.
@@ -96,32 +112,49 @@ bool Game::turn(vector<Player*>::iterator player)
     }
 
     unsigned int count;
+
+    Peg* played = NULL;
+    unsigned int answer = 0;
+
     for ( count = 0 ; count < playable.size() ;count++)
+    {
         cout << count + 1 << "> Peg at " << playable[count]->position << endl;
+        if (played == NULL || played->position < playable[count]->position)
+            answer = count + 1;
+    }
+
+    cout << "Choosing peg " << answer << endl;
     
     // Read user answer
-    unsigned int answer = 0;
-    do
-    {
-        std::string sAnswer;
-        getline(cin, sAnswer);
-        try 
-        {
-            answer = stoi(sAnswer);
-        }
-        catch(std::invalid_argument) {continue;}
-    }
-    while (answer < 1 || answer > count);
-
-    // Play said peg.
-    Peg* played = playable.at(answer-1);
+    /*
+     * DISCLAIMER : I had not read properly that the peg
+     * has to be chosen by the program, I leave this piece
+     * of code for further reference (and possible use
+     * in a "strategy object".
+     * 
+     *do
+     *{
+     *    std::string sAnswer;
+     *    getline(cin, sAnswer);
+     *    try 
+     *    {
+     *        answer = stoi(sAnswer);
+     *    }
+     *    catch(std::invalid_argument) {continue;}
+     *}
+     *while (answer < 1 || answer > count);
+     */
+     
+     // Play said peg.
+     played = playable.at(answer-1);
+     
     
     // I took the liberty of changing the shape of the board depending
     // on the number of players (evenly distributed).
     int start = (*player)->number*(BOARD_SIZE/nplayers);
     int destination = played->position + die;
     int boardSpotDest = ( destination + start) % BOARD_SIZE;
-    int boardSpotInit = ( played->position + start) % BOARD_SIZE;
+    int boardSpotInit = played->boardPos();
     
     if (played->position == -1)
     {
@@ -142,7 +175,10 @@ bool Game::turn(vector<Player*>::iterator player)
     else if (destination < BOARD_SIZE + FINISH_LINE_SIZE)
     {
         (*player)->finish[destination - BOARD_SIZE] = played;
-        board[boardSpotInit] = NULL;
+        if (played->position < BOARD_SIZE)
+            board[boardSpotInit] = NULL;
+        else
+            (*player)->finish[played->position - BOARD_SIZE] = NULL;
         played->position += die;
         
         // Check for win.
@@ -153,16 +189,20 @@ bool Game::turn(vector<Player*>::iterator player)
         }
         if (won)
         {
+            cout << "Player " << (*player)->number << " finished !" << endl;
             winners.push_back(*player);
             players.erase(player);
+            displayAll();
             return true;
         }
     }
     else
     {
         cout << "How did you select this peg ? Try again." << endl;
+        displayAll();
         return true;
     }
+    displayAll();
     return die == 6;
 }
 
