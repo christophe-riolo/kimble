@@ -13,20 +13,23 @@ using std::array;
 #define PEGS_NUMBER 4
 
 class Player;
+class Game;
 
 class Peg
 {
     public:
         Player* owner;
         int position = -1;
-        Peg();
+        Peg(Player* owner);
 };
 
 class Player 
 {
     public:
-        Player(int number);
+        Player(int number, Game* game);
+        ~Player();
         int number;
+        Game* game;
         void getPlayable(int die, vector<Peg*>& playable);
         array<Peg*,FINISH_LINE_SIZE> finish; 
         array<Peg*,PEGS_NUMBER> pegs;
@@ -37,9 +40,11 @@ class Game
 {
     public:
         Game(int nplayers = MAX_PLAYERS);
+        ~Game();
         void play();
-    private:
         array<Peg*,BOARD_SIZE> board;
+        int nplayers;
+    private:
         vector<Player*> players;
         vector<Player*> winners;
 

@@ -1,25 +1,40 @@
 #include <iostream>
+#include <string>
 #include <random>
 #include "kimble.hpp"
 
 using std::cout;
 using std::cin;
+using std::getline;
 using std::endl;
+using std::stoi;
 using std::uniform_int_distribution;
 using std::random_device;
 
 
 Game::Game(int nplayers)
 {
+    this->nplayers = nplayers;
+
     // Initializing board places to null (no peg)
     for (int i = 0 ; i < BOARD_SIZE ; i++)
         board[i] = NULL;
 
     // Creating the players
     for (int i = 0 ; i < nplayers ; i++) 
-        players.push_back(new Player(i));
+        players.push_back(new Player(i, this));
 }
 
+Game::~Game()
+{
+    vector<Player*>::iterator player;
+
+    for ( player = winners.begin() ; player < winners.end() ; player++)
+        delete (*player);
+
+    for ( player = players.begin() ; player < players.end() ; player++)
+        delete (*player);
+}
 // Runs the whole game.
 void Game::play()
 {
@@ -31,7 +46,7 @@ void Game::play()
         // stay at the same place if we popped a 6 or 
         // if the player has finished.
 
-        cout << "Player " << (*currentPlayer)->number << " playing ..." << endl;
+        cout << endl << "Player " << (*currentPlayer)->number << " playing ..." << endl;
         bool replay = turn(currentPlayer);
 
         if(!replay)
@@ -53,7 +68,7 @@ void Game::play()
 // Display the winners at the end of game.
 void Game::displayWinners()
 {
-    for (int i = 0 ; i < winners.size() ; i++)
+    for (unsigned int i = 0 ; i < winners.size() ; i++)
         cout << "#" << i+1 << ": Player " << winners[i]->number << endl;
 }
 
@@ -69,43 +84,66 @@ int Game::pop()
 bool Game::turn(vector<Player*>::iterator player)
 {
     int die = pop();
+    cout << "Rolled a " << die << "." << endl;
 
     vector<Peg*> playable;
     (*player)->getPlayable(die, playable);
 
-    int count;
+    if (playable.begin() == playable.end()) // nothing can be played
+    {
+        cout << "No peg to play." << endl;
+        return false;
+    }
+
+    unsigned int count;
     for ( count = 0 ; count < playable.size() ;count++)
         cout << count + 1 << "> Peg at " << playable[count]->position << endl;
     
     // Read user answer
-    int answer = 0;
+    unsigned int answer = 0;
     do
-        cin >> answer;
-    while (answer < 1 || answer >= count);
+    {
+        std::string sAnswer;
+        getline(cin, sAnswer);
+        try 
+        {
+            answer = stoi(sAnswer);
+        }
+        catch(std::invalid_argument) {continue;}
+    }
+    while (answer < 1 || answer > count);
 
     // Play said peg.
-    Peg* played = playable.at(answer);
+    Peg* played = playable.at(answer-1);
+    
+    // I took the liberty of changing the shape of the board depending
+    // on the number of players (evenly distributed).
+    int start = (*player)->number*(BOARD_SIZE/nplayers);
+    int destination = played->position + die;
+    int boardSpotDest = ( destination + start) % BOARD_SIZE;
+    int boardSpotInit = ( played->position + start) % BOARD_SIZE;
+    
     if (played->position == -1)
     {
         played->position = 0;
 
-        // I took the liberty of changing the shape of the board depending
-        // on the number of players (evenly distributed).
-        int start = (*player)->number*(BOARD_SIZE/players.size());
         if (board[start] != NULL)
             board[start]->position = -1;
         board[start] = played;
     }
-    else if (played->position + die < BOARD_SIZE)
+    else if (destination < BOARD_SIZE)
     {
-        int destination = played->position + die;
-        if (board[destination] != NULL)
-            board[destination]->position = -1;
-        board[destination] = played;
+        if (board[boardSpotDest] != NULL)
+            board[boardSpotDest]->position = -1;
+        board[boardSpotDest] = played;
+        board[boardSpotInit] = NULL;
+        played->position += die;
     }
-    else if (played->position + die < BOARD_SIZE + FINISH_LINE_SIZE)
+    else if (destination < BOARD_SIZE + FINISH_LINE_SIZE)
     {
-        (*player)->finish[played->position + die - BOARD_SIZE] = played;
+        (*player)->finish[destination - BOARD_SIZE] = played;
+        board[boardSpotInit] = NULL;
+        played->position += die;
         
         // Check for win.
         bool won = true;
