@@ -1,4 +1,3 @@
-#include <iostream>
 #include <string>
 #include <random>
 #include "kimble.hpp"
@@ -12,55 +11,57 @@ using std::uniform_int_distribution;
 using std::random_device;
 
 
-Game::Game(int nplayers)
+Game::Game(int nplayers):
+    m_nplayers{nplayers},
+    m_board{}
 {
-    this->nplayers = nplayers;
-
-    // Initializing board places to null (no peg)
-    for (int i = 0 ; i < BOARD_SIZE ; i++)
-        board[i] = NULL;
-
     // Creating the players
     for (int i = 0 ; i < nplayers ; i++) 
-        players.push_back(new Player(i, this));
+        m_players.emplace_back(*this);
 }
 
-Game::~Game()
+Game::Game():
+    Game(4)
 {
-    vector<Player*>::iterator player;
-
-    for ( player = winners.begin() ; player < winners.end() ; player++)
-        delete (*player);
-
-    for ( player = players.begin() ; player < players.end() ; player++)
-        delete (*player);
 }
+
 // Runs the whole game.
 void Game::play()
 {
-    vector<Player*>::iterator currentPlayer = players.begin();
+    list<Player>::iterator currentPlayer = m_players.begin();
     // The game is finished when all players but one have won.
-    while(players.size() > 1)
+    while(m_players.size() > 1)
     {
         // Tells if we advance the iterator or not. We can
         // stay at the same place if we popped a 6 or 
         // if the player has finished.
 
-        cout << endl << "Player " << (*currentPlayer)->number << " playing ..." << endl;
+        cout << endl << "Player " << currentPlayer->getNumber() << " playing ..." << endl;
         bool replay = turn(currentPlayer);
+
+        if (currentPlayer->hasWon())
+        {
+            cout << "Player " << currentPlayer->getNumber() << " finished !" << endl;
+            m_winners.push_back(*currentPlayer);
+            currentPlayer = m_players.erase(currentPlayer);
+            displayAll();
+            replay = true;
+        }
 
         if(!replay)
             currentPlayer++;
+
 
         // We replay also when a player has won.
         // But if he was the last player in the vector,
         // we still need to go back to the first.
         currentPlayer =
-            (currentPlayer >= players.end()) ?
-            players.begin():
+            (currentPlayer == m_players.end()) ?
+            m_players.begin():
             currentPlayer;
     }
 
+    cout << "Game over !";
     displayWinners();
 
 }
@@ -68,24 +69,19 @@ void Game::play()
 // Display the winners at the end of game.
 void Game::displayWinners()
 {
-    cout << "Winners :" << endl;
-    for (unsigned int i = 0 ; i < winners.size() ; i++)
-        cout  << "#" << i+1 << ": Player " << winners[i]->number << endl;
+    cout << "\nWinners :" << endl;
+    for (unsigned int i = 0 ; i < m_winners.size() ; i++)
+        cout  << "#" << i+1 << ": Player " << m_winners[i].getNumber() << endl;
 }
 
 // Display situation
 void Game::displayAll()
 {
     displayWinners();
-    cout << "Players :" << endl;
-    for (unsigned int i = 0 ; i < players.size() ; i++)
-    {
-        cout << "Player " << players[i]-> number << ":" << endl;
-        for (unsigned int p = 0; p < PEGS_NUMBER ; p++)
-            cout << "\t" << (players[i]->pegs[p]->boardPos()) << "(" << players[i]->pegs[p]->position << ")";
-        cout << endl;
-    }
-
+    cout << "\nPlayers :" << endl;
+    for (auto player = m_players.begin() ; player != m_players.end() ; player++)
+        cout << *player << "\n";
+    cout << endl;
 }
 
 // "Pops" (roll) the die.
@@ -97,13 +93,13 @@ int Game::pop()
 }
 
 // Plays a turn of the given player. Returns true if player popped a 6 or won.
-bool Game::turn(vector<Player*>::iterator player)
+bool Game::turn(list<Player>::iterator player)
 {
     int die = pop();
     cout << "Rolled a " << die << "." << endl;
 
     vector<Peg*> playable;
-    (*player)->getPlayable(die, playable);
+    player->getPlayable(die, playable);
 
     if (playable.begin() == playable.end()) // nothing can be played
     {
@@ -113,13 +109,12 @@ bool Game::turn(vector<Player*>::iterator player)
 
     unsigned int count;
 
-    Peg* played = NULL;
     unsigned int answer = 0;
 
-    for ( count = 0 ; count < playable.size() ;count++)
+    for (count = 0 ; count < playable.size() ;count++)
     {
-        cout << count + 1 << "> Peg at " << playable[count]->position << endl;
-        if (played == NULL || played->position < playable[count]->position)
+        cout << count + 1 << "> Peg at " << playable[count]->getPosition() << endl;
+        if (answer == 0 || playable[answer]->getPosition() < playable[count]->getPosition())
             answer = count + 1;
     }
 
@@ -146,55 +141,42 @@ bool Game::turn(vector<Player*>::iterator player)
      */
      
      // Play said peg.
-     played = playable.at(answer-1);
+     auto played = playable.at(answer-1);
      
     
     // I took the liberty of changing the shape of the board depending
     // on the number of players (evenly distributed).
-    int start = (*player)->number*(BOARD_SIZE/nplayers);
-    int destination = played->position + die;
-    int boardSpotDest = ( destination + start) % BOARD_SIZE;
+    int start = player->getNumber()*(Kimble::board_size/m_nplayers);
+    int destination = played->getPosition() + die;
+    int boardSpotDest = ( destination + start) % Kimble::board_size;
     int boardSpotInit = played->boardPos();
     
-    if (played->position == -1)
+    if (played->getPosition() == -1)
     {
-        played->position = 0;
+        played->getPosition() = 0;
 
-        if (board[start] != NULL)
-            board[start]->position = -1;
-        board[start] = played;
+        if (m_board[start] != nullptr)
+            m_board[start]->getPosition() = -1;
+        m_board[start] = played;
     }
-    else if (destination < BOARD_SIZE)
+    else if (destination < Kimble::board_size)
     {
-        if (board[boardSpotDest] != NULL)
-            board[boardSpotDest]->position = -1;
-        board[boardSpotDest] = played;
-        board[boardSpotInit] = NULL;
-        played->position += die;
+        if (m_board[boardSpotDest] != nullptr)
+            m_board[boardSpotDest]->getPosition() = -1;
+        m_board[boardSpotDest] = played;
+        m_board[boardSpotInit] = nullptr;
+        played->getPosition() += die;
     }
-    else if (destination < BOARD_SIZE + FINISH_LINE_SIZE)
+    else if (destination < Kimble::board_size + Kimble::finish_line_size)
     {
-        (*player)->finish[destination - BOARD_SIZE] = played;
-        if (played->position < BOARD_SIZE)
-            board[boardSpotInit] = NULL;
+        player->getFinish()[destination - Kimble::board_size] = played;
+        if (played->getPosition() < Kimble::board_size)
+            m_board[boardSpotInit] = nullptr;
         else
-            (*player)->finish[played->position - BOARD_SIZE] = NULL;
-        played->position += die;
+            player->getFinish()[played->getPosition() - Kimble::board_size] = nullptr;
+        played->getPosition() += die;
         
-        // Check for win.
-        bool won = true;
-        for (int i = 0 ; won && i < FINISH_LINE_SIZE ; i++)
-        {
-            won = won && (*player)->finish[i];
-        }
-        if (won)
-        {
-            cout << "Player " << (*player)->number << " finished !" << endl;
-            winners.push_back(*player);
-            players.erase(player);
-            displayAll();
-            return true;
-        }
+        return false;
     }
     else
     {
@@ -205,5 +187,11 @@ bool Game::turn(vector<Player*>::iterator player)
     displayAll();
     return die == 6;
 }
+
+const array<Peg*,Kimble::board_size>& Game::getBoard() const
+{
+    return m_board;
+}
+
 
 // vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4 fdm=syntax

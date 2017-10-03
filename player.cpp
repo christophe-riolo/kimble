@@ -1,63 +1,71 @@
 #include "kimble.hpp"
 
-Player::Player(int number, Game* game)
+int Player::n_players {0};
+
+Player::Player(Game& game):
+    m_pegs{Kimble::pegs_number, Peg(*this)},
+    m_number{n_players},
+    m_game{game},
+    m_finish{}
 {
-    this->number = number;
-    this->game = game;
-
-    for (int i = 0 ; i < FINISH_LINE_SIZE ; i++)
-    {
-        finish[i] = NULL; 
-    }
-
-    for (int i = 0 ; i < PEGS_NUMBER; i++)
-    {
-        pegs[i] = new Peg(this); 
-    }
+    ++n_players;
 }
 
-Player::~Player()
+bool Player::hasWon() const
 {
-    for (int i = 0 ; i < PEGS_NUMBER ; i++)
-        delete pegs[i];
+    // Check for win.
+    bool won = true;
+    for (int i = 0 ; won && i < Kimble::finish_line_size ; i++)
+    {
+        won = won && m_finish[i];
+    }
+    return won;
 }
 
-void Player::getPlayable(int die, vector<Peg*>& playable)
+ostream& operator<<(ostream& out, const Player& player)
 {
-    for (array<Peg*,PEGS_NUMBER>::iterator peg = pegs.begin() ; peg < pegs.end() ; peg++)
+    out << "Player " << player.m_number << ":\n";
+    for (auto peg = player.m_pegs.begin(); peg < player.m_pegs.end() ; peg++)
+        out << "\t" << *peg;
+    return out;
+}
+
+void Player::getPlayable(int die, vector<Peg*> &playable)
+{
+    for (vector<Peg>::iterator peg = m_pegs.begin() ; peg < m_pegs.end() ; peg++)
     {
         // The starting point on the board for current player.
-        int startSpot = (number*(BOARD_SIZE/(game->nplayers)));
+        int startSpot = (m_number*(Kimble::board_size/(m_game.m_nplayers)));
 
         // Testing if peg is out of game.
-        if ((*peg)->position == -1)
+        if (peg->getPosition() == -1)
         {
             if (
                     die == 6
-                && (game->board[startSpot] == NULL
-                ||  game->board[startSpot]->owner != this)
+                && (m_game.getBoard()[startSpot] == nullptr
+                ||  m_game.getBoard()[startSpot]->getOwner() != *this)
                ) 
-                playable.push_back(*peg);
+                playable.push_back(&*peg);
         }
         else 
         {
             // destination is where the peg would go on its way from sart (0) to the finish line.
             // boardSpot on the other hand is the actual index of game->board where it goes.
-            int destination = (*peg)->position + die;
-            int boardSpot = ( destination + startSpot) % BOARD_SIZE;
+            int destination = peg->getPosition() + die;
+            int boardSpot = ( destination + startSpot) % Kimble::board_size;
             
             // We must check that we will not go on our own peg.
             if (
-                        destination < BOARD_SIZE
-                    && (game->board[boardSpot] == NULL
-                    ||  game->board[boardSpot]->owner != this)
+                        destination < Kimble::board_size
+                    && (m_game.getBoard()[boardSpot] == nullptr
+                    ||  m_game.getBoard()[boardSpot]->getOwner() != *this)
                )
-                playable.push_back(*peg);
+                playable.push_back(&*peg);
             else if (
-                    destination < BOARD_SIZE + FINISH_LINE_SIZE
-                    && finish[destination - BOARD_SIZE] == NULL
+                    destination < Kimble::board_size + Kimble::finish_line_size
+                    && m_finish[destination - Kimble::board_size] == nullptr
                     )
-                playable.push_back(*peg);
+                playable.push_back(&*peg);
             // If the peg would go overboard (pun intended) of on our own other peg,
             // we do not add it.
 

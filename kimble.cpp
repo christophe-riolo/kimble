@@ -8,7 +8,7 @@ using std::stoi;
 
 int main(int argc, char* argv[])
 {
-    Game* game = NULL;
+    Game* game = nullptr;
     if(argc == 1)
         game = new Game();
     else if (argc == 2)
